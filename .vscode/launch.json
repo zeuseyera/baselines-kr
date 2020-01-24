@@ -1,0 +1,45 @@
+{
+    // IntelliSense를 사용하여 가능한 특성에 대해 알아보세요.
+    // 기존 특성에 대한 설명을 보려면 가리킵니다.
+    // 자세한 내용을 보려면 https://go.microsoft.com/fwlink/?linkid=830387 을(를) 방문하세요.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python: ACKTR 디버그"
+            , "type": "python"
+            //, "env": [ "encoding", "utf-8" ]
+            , "request": "launch"
+            // 실행할 파이썬 모듈(파일)
+            , "module": "baselines.run"
+            // 전달할 결정고유값
+            , "args": [ "--alg", "acktr"
+                    , "--env", "PongNoFrameskip-v4"
+                    //, "--num_timesteps", "2e7"
+                    //, "--save_path", "models/pong_20M_acktr.weights_tf"
+                    , "--num_timesteps", "1e6"
+                    // 경로와 파일이름을 지정
+                    , "--load_path", "models/pong_acktr.weights_tf"
+                    , "--save_path", "models/pong_acktr.weights_tf"
+                    // 경로만 지정
+                    , "--log_path", "logs/Pong/"
+                    , "--play", "1"
+                    //, "--JeoJangBo", "500000"
+            ]
+        },
+        {
+            "name": "Python: PPO 디버그"
+            , "type": "python"
+            , "request": "launch"
+            , "module": "baselines.run"
+            , "args": [ "--alg", "ppo2"
+                    , "--env", "PongNoFrameskip-v4"
+                    //, "--num_timesteps", "2e7"
+                    //, "--save_path", "models/pong_20M_ppo2.weights_tf"
+                    , "--num_timesteps", "1e6"
+                    , "--load_path", "models/pong_ppo2.weights_tf"
+                    , "--save_path", "models/pong_ppo2.weights_tf"
+                    , "--log_path", "logs/Pong/"
+            ]
+        }
+    ]
+}

@@ -8,10 +8,11 @@ def sample(logits):
     return tf.argmax(logits - tf.log(-tf.log(noise)), 1)
 
 def cat_entropy(logits):
-    a0 = logits - tf.reduce_max(logits, 1, keepdims=True)
+    a0  = logits - tf.reduce_max(logits, 1, keepdims=True)
     ea0 = tf.exp(a0)
-    z0 = tf.reduce_sum(ea0, 1, keepdims=True)
-    p0 = ea0 / z0
+    z0  = tf.reduce_sum(ea0, 1, keepdims=True)
+    p0  = ea0 / z0
+
     return tf.reduce_sum(p0 * (tf.log(z0) - a0), 1)
 
 def cat_entropy_softmax(p0):
@@ -118,12 +119,13 @@ def lnlstm(xs, ms, s, scope, nh, init_scale=1.0):
         gh = tf.get_variable("gh", [nh*4], initializer=tf.constant_initializer(1.0))
         bh = tf.get_variable("bh", [nh*4], initializer=tf.constant_initializer(0.0))
 
-        b = tf.get_variable("b", [nh*4], initializer=tf.constant_initializer(0.0))
+        b  = tf.get_variable("b",  [nh*4], initializer=tf.constant_initializer(0.0))
 
         gc = tf.get_variable("gc", [nh], initializer=tf.constant_initializer(1.0))
         bc = tf.get_variable("bc", [nh], initializer=tf.constant_initializer(0.0))
 
     c, h = tf.split(axis=1, num_or_size_splits=2, value=s)
+
     for idx, (x, m) in enumerate(zip(xs, ms)):
         c = c*(1-m)
         h = h*(1-m)
@@ -136,7 +138,9 @@ def lnlstm(xs, ms, s, scope, nh, init_scale=1.0):
         c = f*c + i*u
         h = o*tf.tanh(_ln(c, gc, bc))
         xs[idx] = h
+
     s = tf.concat(axis=1, values=[c, h])
+    
     return xs, s
 
 def conv_to_fc(x):

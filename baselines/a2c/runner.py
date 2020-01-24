@@ -2,7 +2,7 @@ import numpy as np
 from baselines.a2c.utils import discount_with_dones
 from baselines.common.runners import AbstractEnvRunner
 
-class Runner(AbstractEnvRunner):
+class Runner( AbstractEnvRunner ):
     """
     We use this class to generate batches of experiences
 
@@ -12,21 +12,22 @@ class Runner(AbstractEnvRunner):
     run():
     - Make a mini batch of experiences
     """
-    def __init__(self, env, model, nsteps=5, gamma=0.99):
-        super().__init__(env=env, model=model, nsteps=nsteps)
+    def __init__( self, env, model, nsteps=5, gamma=0.99 ):
+        super().__init__( env=env, model=model, nsteps=nsteps )
         self.gamma = gamma
         self.batch_action_shape = [x if x is not None else -1 for x in model.train_model.action.shape.as_list()]
         self.ob_dtype = model.train_model.X.dtype.as_numpy_dtype
 
-    def run(self):
+    def run( self ):
         # We initialize the lists that will contain the mb of experiences
-        mb_obs, mb_rewards, mb_actions, mb_values, mb_dones = [],[],[],[],[]
-        mb_states = self.states
-        epinfos = []
+        mb_obs, mb_rewards, mb_actions, mb_values, mb_dones = [], [], [], [], []
+        mb_states   = self.states
+        epinfos     = []
+
         for n in range(self.nsteps):
             # Given observations, take action and value (V(s))
             # We already have self.obs because Runner superclass run self.obs[:] = env.reset() on init
-            actions, values, states, _ = self.model.step(self.obs, S=self.states, M=self.dones)
+            actions, values, states, _ = self.model.step( self.obs, S=self.states, M=self.dones )
 
             # Append the experiences
             mb_obs.append(np.copy(self.obs))
@@ -40,19 +41,20 @@ class Runner(AbstractEnvRunner):
                 maybeepinfo = info.get('episode')
                 if maybeepinfo: epinfos.append(maybeepinfo)
             self.states = states
-            self.dones = dones
-            self.obs = obs
+            self.dones  = dones
+            self.obs    = obs
             mb_rewards.append(rewards)
+
         mb_dones.append(self.dones)
 
         # Batch of steps to batch of rollouts
-        mb_obs = np.asarray(mb_obs, dtype=self.ob_dtype).swapaxes(1, 0).reshape(self.batch_ob_shape)
-        mb_rewards = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)
-        mb_actions = np.asarray(mb_actions, dtype=self.model.train_model.action.dtype.name).swapaxes(1, 0)
-        mb_values = np.asarray(mb_values, dtype=np.float32).swapaxes(1, 0)
-        mb_dones = np.asarray(mb_dones, dtype=np.bool).swapaxes(1, 0)
-        mb_masks = mb_dones[:, :-1]
-        mb_dones = mb_dones[:, 1:]
+        mb_obs      = np.asarray(mb_obs, dtype=self.ob_dtype).swapaxes(1, 0).reshape(self.batch_ob_shape)
+        mb_rewards  = np.asarray(mb_rewards, dtype=np.float32).swapaxes(1, 0)
+        mb_actions  = np.asarray(mb_actions, dtype=self.model.train_model.action.dtype.name).swapaxes(1, 0)
+        mb_values   = np.asarray(mb_values, dtype=np.float32).swapaxes(1, 0)
+        mb_dones    = np.asarray(mb_dones, dtype=np.bool).swapaxes(1, 0)
+        mb_masks    = mb_dones[:, :-1]
+        mb_dones    = mb_dones[:, 1:]
 
 
         if self.gamma > 0.0:
@@ -68,9 +70,9 @@ class Runner(AbstractEnvRunner):
 
                 mb_rewards[n] = rewards
 
-        mb_actions = mb_actions.reshape(self.batch_action_shape)
+        mb_actions  = mb_actions.reshape(self.batch_action_shape)
 
-        mb_rewards = mb_rewards.flatten()
-        mb_values = mb_values.flatten()
-        mb_masks = mb_masks.flatten()
+        mb_rewards  = mb_rewards.flatten()
+        mb_values   = mb_values.flatten()
+        mb_masks    = mb_masks.flatten()
         return mb_obs, mb_states, mb_rewards, mb_masks, mb_actions, mb_values, epinfos

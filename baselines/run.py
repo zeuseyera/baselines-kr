@@ -1,4 +1,10 @@
+# -*- Encoding: utf-8 -*-
+
 import sys
+import io
+sys.stdout = io.TextIOWrapper(sys.stdout.detach(), encoding = 'utf-8')
+sys.stderr = io.TextIOWrapper(sys.stderr.detach(), encoding = 'utf-8')
+
 import re
 import multiprocessing
 import os.path as osp
@@ -50,20 +56,25 @@ _game_envs['retro'] = {
 }
 
 
-def train(args, extra_args):
-    env_type, env_id = get_env_type(args)
-    print('env_type: {}'.format(env_type))
+def train( args, extra_args ):
+    env_type, env_id = get_env_type( args )
+    print(' env_type: {}'.format(env_type) )
 
-    total_timesteps = int(args.num_timesteps)
+    total_timesteps = int( args.num_timesteps )
+    #JeoJangBo       = int( args.JeoJangBo )
     seed = args.seed
 
     learn = get_learn_function(args.alg)
     alg_kwargs = get_learn_function_defaults(args.alg, env_type)
     alg_kwargs.update(extra_args)
 
-    env = build_env(args)
+    env = build_env( args )
+
     if args.save_video_interval != 0:
-        env = VecVideoRecorder(env, osp.join(logger.get_dir(), "videos"), record_video_trigger=lambda x: x % args.save_video_interval == 0, video_length=args.save_video_length)
+        env = VecVideoRecorder( env
+                            , osp.join( logger.get_dir(), "videos" )
+                            , record_video_trigger = lambda x: x % args.save_video_interval == 0
+                            , video_length         = args.save_video_length )
 
     if args.network:
         alg_kwargs['network'] = args.network
@@ -71,46 +82,67 @@ def train(args, extra_args):
         if alg_kwargs.get('network') is None:
             alg_kwargs['network'] = get_default_network(env_type)
 
-    print('Training {} on {}:{} with arguments \n{}'.format(args.alg, env_type, env_id, alg_kwargs))
+    print( 'Training {} on {}:{} with arguments \n{}'.format(args.alg, env_type, env_id, alg_kwargs) )
 
-    model = learn(
-        env=env,
-        seed=seed,
-        total_timesteps=total_timesteps,
-        **alg_kwargs
-    )
+    model = learn( env            = env
+                , seed            = seed
+                , total_timesteps = total_timesteps
+                #, save_interval   = JeoJangBo
+                #, save_interval   = 500000
+                , **alg_kwargs )
 
     return model, env
 
 
-def build_env(args):
-    ncpu = multiprocessing.cpu_count()
+def build_env( args ):
+    ncpu    = multiprocessing.cpu_count()
+
     if sys.platform == 'darwin': ncpu //= 2
-    nenv = args.num_env or ncpu
-    alg = args.alg
-    seed = args.seed
+
+    nenv    = args.num_env or ncpu
+    alg     = args.alg
+    seed    = args.seed
 
     env_type, env_id = get_env_type(args)
 
     if env_type in {'atari', 'retro'}:
         if alg == 'deepq':
-            env = make_env(env_id, env_type, seed=seed, wrapper_kwargs={'frame_stack': True})
+            env = make_env( env_id, env_type, seed=seed, wrapper_kwargs={'frame_stack': True} )
         elif alg == 'trpo_mpi':
             env = make_env(env_id, env_type, seed=seed)
         else:
             frame_stack_size = 4
-            env = make_vec_env(env_id, env_type, nenv, seed, gamestate=args.gamestate, reward_scale=args.reward_scale)
-            env = VecFrameStack(env, frame_stack_size)
+            env = make_vec_env( env_id
+                            , env_type
+                            , nenv
+                            , seed
+                            , gamestate     = args.gamestate
+                            , reward_scale  = args.reward_scale )
+            env = VecFrameStack( env, frame_stack_size )
 
     else:
-        config = tf.ConfigProto(allow_soft_placement=True,
-                               intra_op_parallelism_threads=1,
-                               inter_op_parallelism_threads=1)
-        config.gpu_options.allow_growth = True
-        get_session(config=config)
+        #config = tf.ConfigProto( allow_soft_placement       = True
+        #                    , intra_op_parallelism_threads  = 1
+        #                    , inter_op_parallelism_threads  = 1 )
+        #config.gpu_options.allow_growth = True
+
+        options = tf.GPUOptions( allow_growth = True )
+        #                    , per_process_gpu_memory_fraction = 0.8 )
+
+        config = tf.ConfigProto( allow_soft_placement       = True
+                            , intra_op_parallelism_threads  = 1
+                            , inter_op_parallelism_threads  = 1
+                            , gpu_options                   = options )
+
+        get_session( config = config )
 
         flatten_dict_observations = alg not in {'her'}
-        env = make_vec_env(env_id, env_type, args.num_env or 1, seed, reward_scale=args.reward_scale, flatten_dict_observations=flatten_dict_observations)
+        env = make_vec_env( env_id
+                        , env_type
+                        , args.num_env or 1
+                        , seed
+                        , reward_scale              = args.reward_scale
+                        , flatten_dict_observations = flatten_dict_observations )
 
         if env_type == 'mujoco':
             env = VecNormalize(env, use_tf=True)
@@ -131,7 +163,7 @@ def get_env_type(args):
 
     if env_id in _game_envs.keys():
         env_type = env_id
-        env_id = [g for g in _game_envs[env_type]][0]
+        env_id   = [g for g in _game_envs[env_type]][0]
     else:
         env_type = None
         for g, e in _game_envs.items():
@@ -192,59 +224,61 @@ def parse_cmdline_kwargs(args):
     return {k: parse(v) for k,v in parse_unknown_args(args).items()}
 
 
-def configure_logger(log_path, **kwargs):
+def configure_logger( log_path, **kwargs ):
     if log_path is not None:
         logger.configure(log_path)
     else:
         logger.configure(**kwargs)
 
 
-def main(args):
+def main( args ):
     # configure logger, disable logging in child MPI processes (with rank > 0)
 
-    arg_parser = common_arg_parser()
-    args, unknown_args = arg_parser.parse_known_args(args)
-    extra_args = parse_cmdline_kwargs(unknown_args)
+    arg_parser          = common_arg_parser()
+    args, unknown_args  = arg_parser.parse_known_args( args )
+    extra_args          = parse_cmdline_kwargs( unknown_args )
 
     if MPI is None or MPI.COMM_WORLD.Get_rank() == 0:
         rank = 0
-        configure_logger(args.log_path)
+        configure_logger( args.log_path )
     else:
         rank = MPI.COMM_WORLD.Get_rank()
-        configure_logger(args.log_path, format_strs=[])
+        configure_logger( args.log_path, format_strs=[] )
 
-    model, env = train(args, extra_args)
+    model, env = train( args, extra_args )
 
     if args.save_path is not None and rank == 0:
-        save_path = osp.expanduser(args.save_path)
-        model.save(save_path)
+        save_path = osp.expanduser( args.save_path )
+        model.save( save_path )
 
     if args.play:
-        logger.log("Running trained model")
+        logger.log( "Running trained model" )
         obs = env.reset()
 
-        state = model.initial_state if hasattr(model, 'initial_state') else None
+        state = model.initial_state if hasattr( model, 'initial_state' ) else None
         dones = np.zeros((1,))
 
         episode_rew = np.zeros(env.num_envs) if isinstance(env, VecEnv) else np.zeros(1)
+
         while True:
             if state is not None:
-                actions, _, state, _ = model.step(obs,S=state, M=dones)
+                actions, _, state, _ = model.step( obs, S=state, M=dones )
             else:
-                actions, _, _, _ = model.step(obs)
+                actions, _, _, _ = model.step( obs )
 
-            obs, rew, done, _ = env.step(actions)
+            obs, rew, done, _ = env.step( actions )
             episode_rew += rew
             env.render()
-            done_any = done.any() if isinstance(done, np.ndarray) else done
+            done_any = done.any() if isinstance( done, np.ndarray ) else done
+
             if done_any:
-                for i in np.nonzero(done)[0]:
-                    print('episode_rew={}'.format(episode_rew[i]))
-                    episode_rew[i] = 0
+                for ii in np.nonzero(done)[0]:
+                    print( 'episode_rew={}'.format( episode_rew[ii] ) )
+                    episode_rew[ii] = 0
 
     env.close()
 
     return model
 
 if __name__ == '__main__':
-    main(sys.argv)
+    main( sys.argv )

@@ -11,7 +11,7 @@ try:
 except ImportError:
     MPI = None
 
-class Model(object):
+class Model( object ):
     """
     We use this object to :
     __init__:
@@ -24,8 +24,20 @@ class Model(object):
     save/load():
     - Save load the model
     """
-    def __init__(self, *, policy, ob_space, ac_space, nbatch_act, nbatch_train,
-                nsteps, ent_coef, vf_coef, max_grad_norm, mpi_rank_weight=1, comm=None, microbatch_size=None):
+    def __init__( self
+                , *
+                , policy
+                , ob_space
+                , ac_space
+                , nbatch_act
+                , nbatch_train
+                , nsteps
+                , ent_coef
+                , vf_coef
+                , max_grad_norm
+                , mpi_rank_weight   = 1
+                , comm              = None
+                , microbatch_size   = None ):
         self.sess = sess = get_session()
 
         if MPI is not None and comm is None:
@@ -34,27 +46,27 @@ class Model(object):
         with tf.variable_scope('ppo2_model', reuse=tf.AUTO_REUSE):
             # CREATE OUR TWO MODELS
             # act_model that is used for sampling
-            act_model = policy(nbatch_act, 1, sess)
+            act_model = policy( nbatch_act, 1, sess )
 
             # Train model for training
             if microbatch_size is None:
-                train_model = policy(nbatch_train, nsteps, sess)
+                train_model = policy( nbatch_train, nsteps, sess )
             else:
-                train_model = policy(microbatch_size, nsteps, sess)
+                train_model = policy( microbatch_size, nsteps, sess )
 
         # CREATE THE PLACEHOLDERS
-        self.A = A = train_model.pdtype.sample_placeholder([None])
-        self.ADV = ADV = tf.placeholder(tf.float32, [None])
-        self.R = R = tf.placeholder(tf.float32, [None])
+        self.A            = A            = train_model.pdtype.sample_placeholder([None])
+        self.ADV          = ADV          = tf.placeholder(tf.float32, [None])
+        self.R            = R            = tf.placeholder(tf.float32, [None])
         # Keep track of old actor
         self.OLDNEGLOGPAC = OLDNEGLOGPAC = tf.placeholder(tf.float32, [None])
         # Keep track of old critic
-        self.OLDVPRED = OLDVPRED = tf.placeholder(tf.float32, [None])
-        self.LR = LR = tf.placeholder(tf.float32, [])
+        self.OLDVPRED     = OLDVPRED     = tf.placeholder(tf.float32, [None])
+        self.LR           = LR           = tf.placeholder(tf.float32, [])
         # Cliprange
-        self.CLIPRANGE = CLIPRANGE = tf.placeholder(tf.float32, [])
+        self.CLIPRANGE    = CLIPRANGE    = tf.placeholder(tf.float32, [])
 
-        neglogpac = train_model.pd.neglogp(A)
+        neglogpac = train_model.pd.neglogp( A )
 
         # Calculate the entropy
         # Entropy is used to improve exploration by limiting the premature convergence to suboptimal policy.
@@ -93,11 +105,13 @@ class Model(object):
         # UPDATE THE PARAMETERS USING LOSS
         # 1. Get the model parameters
         params = tf.trainable_variables('ppo2_model')
+
         # 2. Build our trainer
         if comm is not None and comm.Get_size() > 1:
             self.trainer = MpiAdamOptimizer(comm, learning_rate=LR, mpi_rank_weight=mpi_rank_weight, epsilon=1e-5)
         else:
             self.trainer = tf.train.AdamOptimizer(learning_rate=LR, epsilon=1e-5)
+
         # 3. Calculate the gradients
         grads_and_var = self.trainer.compute_gradients(loss, params)
         grads, var = zip(*grads_and_var)
@@ -105,21 +119,22 @@ class Model(object):
         if max_grad_norm is not None:
             # Clip the gradients (normalize)
             grads, _grad_norm = tf.clip_by_global_norm(grads, max_grad_norm)
+
         grads_and_var = list(zip(grads, var))
         # zip aggregate each gradient with parameters associated
         # For instance zip(ABCD, xyza) => Ax, By, Cz, Da
 
-        self.grads = grads
-        self.var = var
-        self._train_op = self.trainer.apply_gradients(grads_and_var)
+        self.grads      = grads
+        self.var        = var
+        self._train_op  = self.trainer.apply_gradients(grads_and_var)
         self.loss_names = ['policy_loss', 'value_loss', 'policy_entropy', 'approxkl', 'clipfrac']
         self.stats_list = [pg_loss, vf_loss, entropy, approxkl, clipfrac]
 
 
         self.train_model = train_model
-        self.act_model = act_model
-        self.step = act_model.step
-        self.value = act_model.value
+        self.act_model  = act_model
+        self.step       = act_model.step
+        self.value      = act_model.value
         self.initial_state = act_model.initial_state
 
         self.save = functools.partial(save_variables, sess=sess)
@@ -127,10 +142,11 @@ class Model(object):
 
         initialize()
         global_variables = tf.get_collection(tf.GraphKeys.GLOBAL_VARIABLES, scope="")
+
         if MPI is not None:
             sync_from_root(sess, global_variables, comm=comm) #pylint: disable=E1101
 
-    def train(self, lr, cliprange, obs, returns, masks, actions, values, neglogpacs, states=None):
+    def train( self, lr, cliprange, obs, returns, masks, actions, values, neglogpacs, states=None ):
         # Here we calculate advantage A(s,a) = R + yV(s') - V(s)
         # Returns = R + yV(s')
         advs = returns - values
@@ -148,12 +164,11 @@ class Model(object):
             self.OLDNEGLOGPAC : neglogpacs,
             self.OLDVPRED : values
         }
+
         if states is not None:
             td_map[self.train_model.S] = states
             td_map[self.train_model.M] = masks
 
-        return self.sess.run(
-            self.stats_list + [self._train_op],
-            td_map
-        )[:-1]
+        return self.sess.run( self.stats_list + [self._train_op]
+                            , td_map )[:-1]
 

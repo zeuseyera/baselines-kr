@@ -1,0 +1,6 @@
+{
+    "python.pythonPath": "C:\\Anaconda3\\envs\\py35tf11\\python.exe"
+    // 터미널 한글깨짐문제
+    //,  "terminal.integrated.setLocaleVariables": true
+    , "terminal.integrated.shellArgs.windows": ["/K", "chcp 65001"]
+}

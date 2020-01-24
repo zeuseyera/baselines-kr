@@ -56,31 +56,48 @@ def q_retrace(R, D, q_i, v, rho_i, nenvs, nsteps, gamma):
 #     return tf.minimum(1 + eps_clip, tf.maximum(1 - eps_clip, ratio))
 
 class Model(object):
-    def __init__(self, policy, ob_space, ac_space, nenvs, nsteps, ent_coef, q_coef, gamma, max_grad_norm, lr,
-                 rprop_alpha, rprop_epsilon, total_timesteps, lrschedule,
-                 c, trust_region, alpha, delta):
+    def __init__( self
+                , policy
+                , ob_space
+                , ac_space
+                , nenvs
+                , nsteps
+                , ent_coef
+                , q_coef
+                , gamma
+                , max_grad_norm
+                , lr
+                , rprop_alpha
+                , rprop_epsilon
+                , total_timesteps
+                , lrschedule
+                , c
+                , trust_region
+                , alpha
+                , delta ):
 
-        sess = get_session()
-        nact = ac_space.n
-        nbatch = nenvs * nsteps
+        sess    = get_session()
+        nact    = ac_space.n
+        nbatch  = nenvs * nsteps
 
-        A = tf.placeholder(tf.int32, [nbatch]) # actions
-        D = tf.placeholder(tf.float32, [nbatch]) # dones
-        R = tf.placeholder(tf.float32, [nbatch]) # rewards, not returns
-        MU = tf.placeholder(tf.float32, [nbatch, nact]) # mu's
-        LR = tf.placeholder(tf.float32, [])
+        A   = tf.placeholder(tf.int32, [nbatch])    # 소행 actions
+        D   = tf.placeholder(tf.float32, [nbatch])  # 다함 dones
+        R   = tf.placeholder(tf.float32, [nbatch])  # 포상 rewards, not returns
+        MU  = tf.placeholder(tf.float32, [nbatch, nact]) # mu's
+        LR  = tf.placeholder(tf.float32, [])
         eps = 1e-6
 
         step_ob_placeholder = tf.placeholder(dtype=ob_space.dtype, shape=(nenvs,) + ob_space.shape)
         train_ob_placeholder = tf.placeholder(dtype=ob_space.dtype, shape=(nenvs*(nsteps+1),) + ob_space.shape)
+
         with tf.variable_scope('acer_model', reuse=tf.AUTO_REUSE):
 
             step_model = policy(nbatch=nenvs, nsteps=1, observ_placeholder=step_ob_placeholder, sess=sess)
             train_model = policy(nbatch=nbatch, nsteps=nsteps, observ_placeholder=train_ob_placeholder, sess=sess)
 
-
         params = find_trainable_variables("acer_model")
         print("Params {}".format(len(params)))
+
         for var in params:
             print(var)
 
@@ -213,8 +230,6 @@ class Model(object):
         def _step(observation, **kwargs):
             return step_model._evaluate([step_model.action, step_model_p, step_model.state], observation, **kwargs)
 
-
-
         self.train = train
         self.save = functools.partial(save_variables, sess=sess)
         self.load = functools.partial(load_variables, sess=sess)
@@ -230,12 +245,12 @@ class Model(object):
 class Acer():
     def __init__(self, runner, model, buffer, log_interval):
         self.runner = runner
-        self.model = model
+        self.model  = model
         self.buffer = buffer
         self.log_interval = log_interval
         self.tstart = None
         self.episode_stats = EpisodeStats(runner.nsteps, runner.nenv)
-        self.steps = None
+        self.steps  = None
 
     def call(self, on_policy):
         runner, model, buffer, steps = self.runner, self.model, self.buffer, self.steps
@@ -250,12 +265,12 @@ class Acer():
 
 
         # reshape stuff correctly
-        obs = obs.reshape(runner.batch_ob_shape)
+        obs     = obs.reshape(runner.batch_ob_shape)
         actions = actions.reshape([runner.nbatch])
         rewards = rewards.reshape([runner.nbatch])
-        mus = mus.reshape([runner.nbatch, runner.nact])
-        dones = dones.reshape([runner.nbatch])
-        masks = masks.reshape([runner.batch_ob_shape[0]])
+        mus     = mus.reshape([runner.nbatch, runner.nact])
+        dones   = dones.reshape([runner.nbatch])
+        masks   = masks.reshape([runner.batch_ob_shape[0]])
 
         names_ops, values_ops = model.train(obs, actions, rewards, dones, mus, model.initial_state, masks, steps)
 
@@ -272,10 +287,29 @@ class Acer():
             logger.dump_tabular()
 
 
-def learn(network, env, seed=None, nsteps=20, total_timesteps=int(80e6), q_coef=0.5, ent_coef=0.01,
-          max_grad_norm=10, lr=7e-4, lrschedule='linear', rprop_epsilon=1e-5, rprop_alpha=0.99, gamma=0.99,
-          log_interval=100, buffer_size=50000, replay_ratio=4, replay_start=10000, c=10.0,
-          trust_region=True, alpha=0.99, delta=1, load_path=None, **network_kwargs):
+def learn( network
+        , env
+        , seed          = None
+        , nsteps        = 20
+        , total_timesteps= int( 80e6 )
+        , q_coef        = 0.5
+        , ent_coef      = 0.01
+        , max_grad_norm = 10
+        , lr            = 7e-4
+        , lrschedule    = 'linear'
+        , rprop_epsilon = 1e-5
+        , rprop_alpha   = 0.99
+        , gamma         = 0.99
+        , log_interval  = 100
+        , buffer_size   = 50000
+        , replay_ratio  = 4
+        , replay_start  = 10000
+        , c             = 10.0
+        , trust_region  = True
+        , alpha         = 0.99
+        , delta         = 1
+        , load_path     = None
+        , **network_kwargs ):
 
     '''
     Main entrypoint for ACER (Actor-Critic with Experience Replay) algorithm (https://arxiv.org/pdf/1611.01224.pdf)
@@ -343,30 +377,48 @@ def learn(network, env, seed=None, nsteps=20, total_timesteps=int(80e6), q_coef=
 
     print("Running Acer Simple")
     print(locals())
+
     set_global_seeds(seed)
+
     if not isinstance(env, VecFrameStack):
         env = VecFrameStack(env, 1)
 
-    policy = build_policy(env, network, estimate_q=True, **network_kwargs)
-    nenvs = env.num_envs
+    policy   = build_policy(env, network, estimate_q=True, **network_kwargs)
+    nenvs    = env.num_envs
     ob_space = env.observation_space
     ac_space = env.action_space
 
-    nstack = env.nstack
-    model = Model(policy=policy, ob_space=ob_space, ac_space=ac_space, nenvs=nenvs, nsteps=nsteps,
-                  ent_coef=ent_coef, q_coef=q_coef, gamma=gamma,
-                  max_grad_norm=max_grad_norm, lr=lr, rprop_alpha=rprop_alpha, rprop_epsilon=rprop_epsilon,
-                  total_timesteps=total_timesteps, lrschedule=lrschedule, c=c,
-                  trust_region=trust_region, alpha=alpha, delta=delta)
+    nstack   = env.nstack
+
+    model = Model( policy       = policy
+                , ob_space      = ob_space
+                , ac_space      = ac_space
+                , nenvs         = nenvs
+                , nsteps        = nsteps
+                , ent_coef      = ent_coef
+                , q_coef        = q_coef
+                , gamma         = gamma
+                , max_grad_norm = max_grad_norm
+                , lr            = lr
+                , rprop_alpha   = rprop_alpha
+                , rprop_epsilon = rprop_epsilon
+                , total_timesteps= total_timesteps
+                , lrschedule    = lrschedule
+                , c             = c
+                , trust_region  = trust_region
+                , alpha         = alpha
+                , delta         = delta )
 
     if load_path is not None:
         model.load(load_path)
 
     runner = Runner(env=env, model=model, nsteps=nsteps)
+
     if replay_ratio > 0:
         buffer = Buffer(env=env, nsteps=nsteps, size=buffer_size)
     else:
         buffer = None
+
     nbatch = nenvs*nsteps
     acer = Acer(runner, model, buffer, log_interval)
     acer.tstart = time.time()
